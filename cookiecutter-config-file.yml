@@ -1,0 +1,13 @@
+# This file contains values from Cookiecutter
+
+default_context:
+  project_name: "logwork"
+  project_description: "Log work to record solutions and allow repeatability"
+  organization: "tbnorth"
+  license: "MIT"
+  minimal_python_version: 3.9
+  github_name: "tbnorth"
+  email: "terrynbrown@gmail.com"
+  version: "0.1.0"
+  line_length: "88"
+  create_example_template: "cli"
