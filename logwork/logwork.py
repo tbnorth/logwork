@@ -86,7 +86,7 @@ def git_info() -> str:
             # Remove the username and password from the URL
             origin = CREDS_REGEX.sub("", origin)
         origin = origin.replace("git@", "")
-        HTTP_REGEX.sub("", origin)
+        origin = HTTP_REGEX.sub("", origin)
     commit = subprocess.run(
         "git rev-parse --short HEAD",
         shell=True,
