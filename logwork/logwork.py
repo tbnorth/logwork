@@ -44,7 +44,9 @@ class WorkState:
 
 
 def git_info() -> str:
-    status = subprocess.run("git status", shell=True, capture_output=True)
+    status = subprocess.run(
+        "git status", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
     status = status.stdout.decode("utf8") + "\n" + status.stderr.decode("utf8")
     if "fatal: " in status:
         return GitInfo()
@@ -74,7 +76,10 @@ def git_info() -> str:
         origin = origin.split()[-1].strip("'.").split("/")[0]
     if origin:
         origin = subprocess.run(
-            "git remote get-url " + origin, shell=True, capture_output=True
+            "git remote get-url " + origin,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
         origin = origin.stdout.decode("utf8").strip()
         if HTTP_REGEX.search(origin):
@@ -83,7 +88,10 @@ def git_info() -> str:
         origin = origin.replace("git@", "")
         HTTP_REGEX.sub("", origin)
     commit = subprocess.run(
-        "git rev-parse --short HEAD", shell=True, capture_output=True
+        "git rev-parse --short HEAD",
+        shell=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
     # Get remote url
     commit = commit.stdout.decode("utf8").strip()
