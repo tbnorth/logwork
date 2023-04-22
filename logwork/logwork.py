@@ -135,7 +135,9 @@ if __name__ == "__main__":
         with WORKLOG.open("a") as log_file:
             log_file.write(datetime.now().strftime("%Y%m%d-%H%M"))
             log_file.write(f" {os.getcwd()} {git_parts}\n")
+        if seconds >= INTERVAL * 60:
+            print(f"\n\n{INTERVAL}+ minutes since last work log entry ", end="")
         # So prompt isn't out of date, but not zero so prompt isn't INTERVAL+1
         seconds = 1
-
+    # Integer minutes plus git status to embed in prompt
     print(int((60 * INTERVAL - seconds) // 60 + 1), git_parts.prompt(), sep="", end="")
