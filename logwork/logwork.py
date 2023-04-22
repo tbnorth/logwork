@@ -1,22 +1,91 @@
+#!/usr/bin/env python3
+import os
 import re
-import time
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+INTERVAL = 15  # Minutes between work log entries
 WORKLOG = "~/.worklog"
 WORKLOG = Path(WORKLOG).expanduser()
 if not WORKLOG.exists():
     WORKLOG.touch()
 TIME_REGEX = re.compile(r"^\d{8}-\d{4} ")
 GIT_REGEX = re.compile(r"\[.*]$")
+HTTP_REGEX = re.compile(r"https?://")
+CREDS_REGEX = re.compile(r"[^/]*@")
+ORIGIN_REGEX = re.compile(r"Your branch is .*'(.+)'")
+
+
+@dataclass
+class GitInfo:
+    branch: str = ""
+    commit: str = ""
+    origin: str = ""
+    flags: str = ""  # !?*+>x - modified, untracked, ahead, new, renamed, deleted
+
+    def __str__(self):
+        return (
+            f"[{self.branch}{self.flags} {self.origin} {self.commit}]"
+            if self.branch
+            else ""
+        )
+
+    def prompt(self):
+        return f"[{self.branch}{self.flags}]" if self.branch else ""
 
 
 @dataclass
 class WorkState:
     time: datetime = None  # Time of the last work log entry
     cwd: Path = None  # Working directory
-    git_info: str = None  # Git commit hash etc.
+    git_info: str = None  # Git commit hash etc., textual representation
+
+
+def git_info() -> str:
+    status = subprocess.run("git status", shell=True, capture_output=True)
+    status = status.stdout.decode("utf8") + "\n" + status.stderr.decode("utf8")
+    if "fatal: " in status:
+        return GitInfo()
+    flags = []
+    if "modified:" in status:
+        flags.append("!")
+    if "Untracked files" in status:
+        flags.append("?")
+    if "Your branch is ahead of" in status:
+        flags.append("*")
+    if "new file:" in status:
+        flags.append("+")
+    if "renamed:" in status:
+        flags.append(">")
+    if "deleted:" in status:
+        flags.append("x")
+    if flags:
+        flags = " " + "".join(flags).strip()
+
+    status = status.splitlines()
+    branch = status[0].split()[-1]
+    origin = next((i for i in status if i.startswith("Your branch")), "")
+    origin = ORIGIN_REGEX.search(origin).group(1) if origin else ""
+    if origin:
+        origin = origin.split()[-1].strip("'.").split("/")[0]
+    if origin:
+        origin = subprocess.run(
+            "git remote get-url " + origin, shell=True, capture_output=True
+        )
+        origin = origin.stdout.decode("utf8").strip()
+        if HTTP_REGEX.search(origin):
+            # Remove the username and password from the URL
+            origin = CREDS_REGEX.sub("", origin)
+        origin = origin.replace("git@", "")
+        HTTP_REGEX.sub("", origin)
+    commit = subprocess.run(
+        "git rev-parse --short HEAD", shell=True, capture_output=True
+    )
+    # Get remote url
+    commit = commit.stdout.decode("utf8").strip()
+    return GitInfo(branch=branch, commit=commit, origin=origin, flags=flags)
 
 
 def last_state() -> WorkState:
@@ -40,7 +109,7 @@ def last_state() -> WorkState:
 
     if last_time:
         time_str = last_time.group(0)
-        last = time.strptime(time_str.strip(), "%Y%m%d-%H%M")
+        last = datetime.strptime(time_str.strip(), "%Y%m%d-%H%M")
         git_str = GIT_REGEX.search(line)
         git_str = git_str.group(0) if git_str else ""
         cwd = line[len(time_str) : -len(git_str) - 1].strip()
@@ -49,8 +118,22 @@ def last_state() -> WorkState:
     return WorkState()
 
 
-last = last_state()
-print(last)
-with WORKLOG.open("a") as log_file:
-    log_file.write(time.strftime("%Y%m%d-%H%M"))
-    log_file.write(f" {last.cwd} {last.git_info}\n")
+if __name__ == "__main__":
+    last = last_state()
+    # print(last)
+    if last.time:
+        seconds = (datetime.now() - last.time).total_seconds()
+    git_parts = git_info()
+    if (
+        not last.time
+        or seconds >= INTERVAL * 60
+        or last.cwd != os.getcwd()
+        or last.git_info != str(git_parts)
+    ):
+        with WORKLOG.open("a") as log_file:
+            log_file.write(datetime.now().strftime("%Y%m%d-%H%M"))
+            log_file.write(f" {os.getcwd()} {git_parts}\n")
+        # So prompt isn't out of date, but not zero so prompt isn't INTERVAL+1
+        seconds = 1
+
+    print(int((60 * INTERVAL - seconds) // 60 + 1), git_parts.prompt(), sep="", end="")
