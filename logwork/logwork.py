@@ -63,6 +63,8 @@ def git_info() -> str:
         flags.append("x")
     if flags:
         flags = " " + "".join(flags).strip()
+    else:
+        flags = ""
 
     status = status.splitlines()
     branch = status[0].split()[-1]
