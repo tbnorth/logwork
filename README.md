@@ -1,5 +1,9 @@
 # logwork
 
+## Ignore the rest of this README
+
+It's just [cookiecutter](https://cookiecutter.readthedocs.io/) template content for now.
+
 <div align="center">
 
 [![Build status](https://github.com/tbnorth/logwork/workflows/build/badge.svg?branch=master&event=push)](https://github.com/tbnorth/logwork/actions?query=workflow%3Abuild)
