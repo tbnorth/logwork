@@ -37,6 +37,13 @@ COMMANDS = {
         f'{SCREEN} vim {WORKLOG} -c "normal G" ' r'-c "?^\d\{8\}-\d\{4\}" '
         '-c "normal zz"',
     },
+    "tail": {
+        "name": "Tail",
+        "command": f"tail -25 {WORKLOG}",
+    },
+    "PS1": {
+        "name": "Prompt",
+    },
 }
 
 
@@ -193,15 +200,17 @@ def tags():
 
 
 def handle_command():
-    args = sys.argv[1:]
+    args = sys.argv[1:] or ["tail"]
     if not args or args[0] not in COMMANDS:
         return
     command = COMMANDS[args[0]]
 
     if "command" in command:
         subprocess.run(command["command"], shell=True)
-    else:
+    elif "function" in command:
         globals()[command["function"]]()
+    else:
+        return  # PS1 mode pass through
 
     sys.exit()
 
