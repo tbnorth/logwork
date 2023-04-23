@@ -19,10 +19,12 @@ CREDS_REGEX = re.compile(r"[^/]*@")
 ORIGIN_REGEX = re.compile(r"Your branch is .*'(.+)'")
 
 # h history command in logwork.sh because that's where the shell history is available
+SCREEN = 'screen' if os.environ.get("STY") else ""
 COMMANDS = {
     "e": {
         "name": "Edit",
-        "command": r'''vim ~/.worklog -c "normal G" -c "s/$/\r\r/" -c "normal G"''',
+        "command": rf'{SCREEN} vim {WORKLOG} -c "normal G" -c "s/$/\r\r/" '
+        '-c "normal G"',
     },
     "t": {
         "name": "Tags",
@@ -31,8 +33,8 @@ COMMANDS = {
     "s": {
         "name": "Log screen",
         "command": "screen -X hardcopy -h /tmp/tmpwl; "
-        "tail -n 100 /tmp/tmpwl >> ~/.worklog; "
-        r'vim ~/.worklog -c "normal G" -c "?^\d\{8\}-\d\{4\}" '
+        f"tail -n 100 /tmp/tmpwl >> {WORKLOG}; "
+        f'{SCREEN} vim {WORKLOG} -c "normal G" ' r'-c "?^\d\{8\}-\d\{4\}" '
         '-c "normal zz"',
     },
 }
