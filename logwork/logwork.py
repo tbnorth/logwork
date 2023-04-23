@@ -180,7 +180,8 @@ def tags():
                 last_tags = set(line[5:].strip().split())
     new_tags = last_tags - tags
     if new_tags:
-        print("New tags:", ", ".join(new_tags))
+        print("Previous tags: ", ", ".join(tags))
+        print("New tags: ", ", ".join(new_tags))
 
 
 def handle_command():
