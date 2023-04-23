@@ -2,6 +2,7 @@
 import os
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,19 @@ GIT_REGEX = re.compile(r"\[.*]$")
 HTTP_REGEX = re.compile(r"https?://")
 CREDS_REGEX = re.compile(r"[^/]*@")
 ORIGIN_REGEX = re.compile(r"Your branch is .*'(.+)'")
+
+# h history command in logwork.sh because that's where the shell history is available
+COMMANDS = {
+    "e": {
+        "name": "Edit",
+        "command": r'''vim ~/.worklog -c "normal G" -c "s/$/\r\r/" -c "normal G"''',
+        "shell": True,
+    },
+    "t": {
+        "name": "Tags",
+        "function": "tags",
+    },
+}
 
 
 @dataclass
@@ -41,6 +55,8 @@ class WorkState:
     time: datetime = None  # Time of the last work log entry
     cwd: Path = None  # Working directory
     git_info: str = None  # Git commit hash etc., textual representation
+    from_end: int = None  # Lines from end of log on which timestamp was found
+    has_tags: bool = None  # Whether the last log entry has any tags
 
 
 def git_info() -> str:
@@ -104,15 +120,18 @@ def last_state() -> WorkState:
     # Rather than the deque approach, which reads the whole file, seek plus list caps
     # the amount of data read to 10,000 bytes.  Seeking only skips data in binary mode,
     # in text mode it needs to read the whole file to account for multi-byte characters.
+    has_tags = False
     with WORKLOG.open("rb") as in_file:
         in_file.seek(max(0, length - 10_000))
         lines = list(in_file)
         last_time = None
-        for line in reversed(lines):
+        for from_end, line in enumerate(reversed(lines)):
             try:
                 line = line.decode("utf8")
             except UnicodeDecodeError:
                 continue  # 10,000 bytes may have split a multi-byte character.
+            if line.startswith("tags:"):
+                has_tags = True
             last_time = TIME_REGEX.match(line)
             if last_time:
                 break
@@ -123,12 +142,63 @@ def last_state() -> WorkState:
         git_str = GIT_REGEX.search(line)
         git_str = git_str.group(0) if git_str else ""
         cwd = line[len(time_str) : -len(git_str) - 1].strip()
-        return WorkState(time=last, cwd=cwd, git_info=git_str)
+        return WorkState(
+            time=last, cwd=cwd, git_info=git_str, from_end=from_end, has_tags=has_tags
+        )
 
     return WorkState()
 
 
+def tags():
+    """Open the work log in vim, with the cursor at the end of the tags line."""
+    # See if the last entry has tags, add tags: line if not
+    last = last_state()
+    if not last.time:
+        print("No previous work log entry found.")
+        return
+    cmd = ["vim -c 'normal G'"]
+    if last.from_end:  # 0k and 1k are the same, both go up one line
+        cmd.append(f"-c 'normal {last.from_end}k'")
+    if not last.has_tags:
+        cmd.append("-c 'normal otags: '")
+    else:
+        cmd.append("-c 'normal j'")
+    cmd.append("-c 'normal $zz'")
+    cmd.append(str(WORKLOG))
+
+    subprocess.run(" ".join(cmd), shell=True)
+
+    # Tell the user about any new (previously unused) tags
+    tags = set()
+    last_tags = set()
+    with WORKLOG.open() as log_file:
+        for line in log_file:
+            if line.startswith("tags:"):
+                if last_tags:
+                    tags.update(last_tags)
+                    last_tags.clear()
+                last_tags = set(line[5:].strip().split())
+    new_tags = last_tags - tags
+    if new_tags:
+        print("New tags:", ", ".join(new_tags))
+
+
+def handle_command():
+    args = sys.argv[1:]
+    if not args or args[0] not in COMMANDS:
+        return
+    command = COMMANDS[args[0]]
+
+    if "command" in command:
+        subprocess.run(command["command"], shell=True)
+    else:
+        globals()[command["function"]]()
+
+    sys.exit()
+
+
 if __name__ == "__main__":
+    handle_command()  # may exit
     last = last_state()
     # print(last)
     if last.time:
