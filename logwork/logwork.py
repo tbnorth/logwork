@@ -23,11 +23,17 @@ COMMANDS = {
     "e": {
         "name": "Edit",
         "command": r'''vim ~/.worklog -c "normal G" -c "s/$/\r\r/" -c "normal G"''',
-        "shell": True,
     },
     "t": {
         "name": "Tags",
         "function": "tags",
+    },
+    "s": {
+        "name": "Log screen",
+        "command": "screen -X hardcopy -h /tmp/tmpwl; "
+        "tail -n 100 /tmp/tmpwl >> ~/.worklog; "
+        r'vim ~/.worklog -c "normal G" -c "?^\d\{8\}-\d\{4\}" '
+        '-c "normal zz"',
     },
 }
 
@@ -199,7 +205,8 @@ def handle_command():
 
 
 if __name__ == "__main__":
-    handle_command()  # may exit
+
+    # Update log *before* handling command
     last = last_state()
     # print(last)
     if last.time:
@@ -218,5 +225,8 @@ if __name__ == "__main__":
             print(f"\n\n{INTERVAL}+ minutes since last work log entry ", end="")
         # So prompt isn't out of date, but not zero so prompt isn't INTERVAL+1
         seconds = 1
+
+    handle_command()  # may exit
+
     # Integer minutes plus git status to embed in prompt
     print(int((60 * INTERVAL - seconds) // 60 + 1), git_parts.prompt(), sep="", end="")
