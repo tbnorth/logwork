@@ -16,7 +16,7 @@ TIME_REGEX = re.compile(r"^\d{8}-\d{4} ")
 GIT_REGEX = re.compile(r"\[.*]$")
 HTTP_REGEX = re.compile(r"https?://")
 CREDS_REGEX = re.compile(r"[^/]*@")
-ORIGIN_REGEX = re.compile(r"Your branch is .*'(.+)'")
+ORIGIN_REGEX = re.compile(r"Your branch .*'(.+)'")
 
 # h history command in logwork.sh because that's where the shell history is available
 SCREEN = 'screen' if os.environ.get("STY") else ""
