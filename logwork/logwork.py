@@ -37,7 +37,7 @@ COMMANDS = {
         f'{SCREEN} vim {WORKLOG} -c "normal G" ' r'-c "?^\d\{8\}-\d\{4\}" '
         '-c "normal zz"',
     },
-    "tail": {
+    "SHOW_TAIL": {  # odd name so `lw tail recursion not working` stores text comment
         "name": "Tail",
         "command": f"tail -25 {WORKLOG}",
     },
@@ -200,17 +200,21 @@ def tags():
 
 
 def handle_command():
-    args = sys.argv[1:] or ["tail"]
-    if not args or args[0] not in COMMANDS:
-        return
-    command = COMMANDS[args[0]]
+    """Handle the command line arguments."""
+    args = sys.argv[1:] or ["SHOW_TAIL"]
+    command = COMMANDS.get(args[0], {})
 
     if "command" in command:
         subprocess.run(command["command"], shell=True)
     elif "function" in command:
         globals()[command["function"]]()
-    else:
+    elif args[0] == "PS1":
         return  # PS1 mode pass through
+    else:
+        # Append command line text to the work log
+        with WORKLOG.open("a") as log_file:
+            log_file.write(" ".join(args))
+            log_file.write("\n")
 
     sys.exit()
 
