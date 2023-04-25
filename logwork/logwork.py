@@ -18,8 +18,9 @@ HTTP_REGEX = re.compile(r"https?://")
 CREDS_REGEX = re.compile(r"[^/]*@")
 ORIGIN_REGEX = re.compile(r"Your branch .*'(.+)'")
 
-# h history command in logwork.sh because that's where the shell history is available
+# so vim doesn't overwrite terminal contents, `altscreen on` in .screenrc might work too
 SCREEN = 'screen' if os.environ.get("STY") else ""
+# h history command in logwork.sh because that's where the shell history is available
 COMMANDS = {
     "e": {
         "name": "Edit",
@@ -227,15 +228,19 @@ if __name__ == "__main__":
     if last.time:
         seconds = (datetime.now() - last.time).total_seconds()
     git_parts = git_info()
+    realpath = Path.cwd().resolve()
     if (
         not last.time
         or seconds >= INTERVAL * 60
-        or last.cwd != os.getcwd()
+        # e.g. in a container, realpath is /home/auser, but in host /users/usr4/auser
+        # so host won't generate new entry just because container logged on under
+        # /home/auser
+        or Path(last.cwd).resolve() != realpath
         or last.git_info != str(git_parts)
     ):
         with WORKLOG.open("a") as log_file:
             log_file.write(datetime.now().strftime("%Y%m%d-%H%M"))
-            log_file.write(f" {os.getcwd()} {git_parts}\n")
+            log_file.write(f" {realpath} {git_parts}\n")
         if seconds >= INTERVAL * 60:
             print(f"\n\n{INTERVAL}+ minutes since last work log entry ", end="")
         # So prompt isn't out of date, but not zero so prompt isn't INTERVAL+1
