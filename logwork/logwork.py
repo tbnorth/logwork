@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import os
 import re
 import subprocess
@@ -17,9 +18,12 @@ GIT_REGEX = re.compile(r"\[.*]$")
 HTTP_REGEX = re.compile(r"https?://")
 CREDS_REGEX = re.compile(r"[^/]*@")
 ORIGIN_REGEX = re.compile(r"Your branch .*'(.+)'")
+# FIXME: git clone --depth 1 causes git to ignore other branches, so git status
+# doesn't report "Your branch ..." info.
+# see https://stackoverflow.com/a/27393574/1072212
 
 # so vim doesn't overwrite terminal contents, `altscreen on` in .screenrc might work too
-SCREEN = 'screen' if os.environ.get("STY") else ""
+SCREEN = "screen" if os.environ.get("STY") else ""
 # h history command in logwork.sh because that's where the shell history is available
 COMMANDS = {
     "e": {
@@ -35,7 +39,8 @@ COMMANDS = {
         "name": "Log screen",
         "command": "screen -X hardcopy -h /tmp/tmpwl; "
         f"tail -n 100 /tmp/tmpwl >> {WORKLOG}; "
-        f'{SCREEN} vim {WORKLOG} -c "normal G" ' r'-c "?^\d\{8\}-\d\{4\}" '
+        f'{SCREEN} vim {WORKLOG} -c "normal G" '
+        r'-c "?^\d\{8\}-\d\{4\}" '
         '-c "normal zz"',
     },
     "SHOW_TAIL": {  # odd name so `lw tail recursion not working` stores text comment
@@ -44,6 +49,10 @@ COMMANDS = {
     },
     "PS1": {
         "name": "Prompt",
+    },
+    "j": {  # command letter subject to change
+        "name": "JSON",
+        "function": "lw_json",
     },
 }
 
@@ -153,16 +162,23 @@ def last_state() -> WorkState:
                 break
 
     if last_time:
-        time_str = last_time.group(0)
-        last = datetime.strptime(time_str.strip(), "%Y%m%d-%H%M")
-        git_str = GIT_REGEX.search(line)
-        git_str = git_str.group(0) if git_str else ""
-        cwd = line[len(time_str) : -len(git_str) - 1].strip()
-        return WorkState(
-            time=last, cwd=cwd, git_info=git_str, from_end=from_end, has_tags=has_tags
-        )
+        return work_state(line, from_end, has_tags=has_tags)
 
     return WorkState()
+
+
+def work_state(line: str, from_end: int = 0, has_tags=None) -> WorkState:
+    last_time = TIME_REGEX.match(line)
+    if not last_time:
+        return WorkState()
+    time_str = last_time.group(0)
+    last = datetime.strptime(time_str.strip(), "%Y%m%d-%H%M")
+    git_str = GIT_REGEX.search(line)
+    git_str = git_str.group(0) if git_str else ""
+    cwd = line[len(time_str) : -len(git_str) - 1].strip()
+    return WorkState(
+        time=last, cwd=cwd, git_info=git_str, from_end=from_end, has_tags=has_tags
+    )
 
 
 def tags():
@@ -200,6 +216,44 @@ def tags():
         print("New tags: ", ", ".join(new_tags))
 
 
+def json_str(work: dict) -> str:
+    """Return a JSON string for the work log entry."""
+    work["hours"] = (work["end"] - work["start"]).total_seconds() / 3600
+    work["start"] = work["start"].strftime("%H:%M")
+    work["end"] = work["end"].strftime("%H:%M")
+    work["tags"] = sorted(work["tags"])
+    return json.dumps(work, indent=2, sort_keys=True)
+
+
+def lw_json():
+    """Dump the work log as JSON."""
+    blank = lambda: {
+        "date": None,
+        "end": None,
+        "hits": 0,
+        "hours": None,
+        "start": None,
+        "tags": set(),
+    }
+    current = blank()
+    with WORKLOG.open() as log_file:
+        for line in log_file:
+            work = work_state(line)
+            if not work.time:
+                if line.startswith("tags:"):
+                    current["tags"].update(line[5:].strip().split())
+                continue
+            if current["date"] != work.time.date().strftime("%a %b %d %Y"):
+                if current["date"]:
+                    print(json_str(current))
+                current = blank()
+                current["date"] = work.time.date().strftime("%a %b %d %Y")
+                current["start"] = work.time
+            current["end"] = work.time
+            current["hits"] += 1
+    print(json_str(current))
+
+
 def handle_command():
     """Handle the command line arguments."""
     args = sys.argv[1:] or ["SHOW_TAIL"]
@@ -221,7 +275,6 @@ def handle_command():
 
 
 if __name__ == "__main__":
-
     # Update log *before* handling command
     last = last_state()
     # print(last)
