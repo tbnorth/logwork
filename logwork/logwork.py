@@ -21,10 +21,12 @@ ORIGIN_REGEX = re.compile(r"Your branch .*'(.+)'")
 # FIXME: git clone --depth 1 causes git to ignore other branches, so git status
 # doesn't report "Your branch ..." info.
 # see https://stackoverflow.com/a/27393574/1072212
+RED = "\033[31m"
+DEFAULT = "\033[0m"
 
 # so vim doesn't overwrite terminal contents, `altscreen on` in .screenrc might work too
 SCREEN = "screen" if os.environ.get("STY") else ""
-# h history command in logwork.sh because that's where the shell history is available
+# H history command in logwork.sh because that's where the shell history is available
 COMMANDS = {
     "e": {
         "name": "Edit",
@@ -53,6 +55,10 @@ COMMANDS = {
     "j": {  # command letter subject to change
         "name": "JSON",
         "function": "lw_json",
+    },
+    "h": {
+        "name": "History",
+        "function": "lw_history",
     },
 }
 
@@ -252,6 +258,26 @@ def lw_json():
             current["end"] = work.time
             current["hits"] += 1
     print(json_str(current))
+
+
+def lw_history():
+    """Show history for this folder."""
+    last = last_state()
+    if not last.time:
+        print("No previous work log entry found.")
+        return
+    printing = False
+    with WORKLOG.open() as in_file:
+        for line in in_file:
+            state = work_state(line, 0, has_tags=None)
+            if state.time:
+                printing = state.cwd == last.cwd
+            if printing:
+                if state.time:
+                    timestamp = f"{RED}# {line}{DEFAULT}"
+                else:
+                    print(f"{timestamp}{line}", end="")
+                    timestamp = ""
 
 
 def handle_command():
