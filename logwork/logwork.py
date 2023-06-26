@@ -22,6 +22,7 @@ ORIGIN_REGEX = re.compile(r"Your branch .*'(.+)'")
 # doesn't report "Your branch ..." info.
 # see https://stackoverflow.com/a/27393574/1072212
 RED = "\033[31m"
+YELLOW = "\033[33m"
 DEFAULT = "\033[0m"
 
 # so vim doesn't overwrite terminal contents, `altscreen on` in .screenrc might work too
@@ -267,17 +268,30 @@ def lw_history():
         print("No previous work log entry found.")
         return
     printing = False
-    with WORKLOG.open() as in_file:
-        for line in in_file:
-            state = work_state(line, 0, has_tags=None)
-            if state.time:
-                printing = state.cwd == last.cwd
-            if printing:
+    timestamp = ""
+    for up_one in range(5):
+        output = False
+        with WORKLOG.open() as in_file:
+            for line in in_file:
+                state = work_state(line, 0, has_tags=None)
                 if state.time:
-                    timestamp = f"{RED}# {line}{DEFAULT}"
-                else:
-                    print(f"{timestamp}{line}", end="")
-                    timestamp = ""
+                    printing = state.cwd == last.cwd
+                if printing:
+                    if state.time:
+                        timestamp = f"{RED}# {line.strip()}{DEFAULT}"
+                        if up_one:
+                            timestamp = (
+                                timestamp.strip()
+                                + f"{YELLOW} {up_one} LEVEL UP{DEFAULT}"
+                            )
+                        timestamp += "\n"
+                    else:
+                        print(f"{timestamp}{line}", end="")
+                        output = True
+                        timestamp = ""
+        if output:
+            break
+        last.cwd = os.path.dirname(last.cwd)
 
 
 def handle_command():
