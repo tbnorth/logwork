@@ -31,8 +31,8 @@ SCREEN = "screen" if os.environ.get("STY") else ""
 COMMANDS = {
     "e": {
         "name": "Edit",
-        "command": rf'{SCREEN} vim {WORKLOG} -c "normal G" -c "s/$/\r\r/" '
-        '-c "normal G"',
+        "command": rf'{SCREEN} vim {WORKLOG} -c "normal G"'
+        # -c "s/$/\r\r/" -c "normal G" to add blank lines
     },
     "t": {
         "name": "Tags",
