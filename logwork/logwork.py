@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -60,6 +61,10 @@ COMMANDS = {
     "h": {
         "name": "History",
         "function": "lw_history",
+    },
+    "P": {
+        "name": "Percent",
+        "function": "lw_percent",
     },
 }
 
@@ -259,6 +264,29 @@ def lw_json():
             current["end"] = work.time
             current["hits"] += 1
     print(json_str(current))
+
+
+def lw_percent():
+    """Show percent by path"""
+    total = 0
+    count = defaultdict(int)
+    with WORKLOG.open() as log_file:
+        for line in log_file:
+            work = work_state(line)
+            if not work.time or not work.cwd:
+                continue
+            path = Path(work.cwd)
+            if Path(path).exists():
+                path = path.resolve()
+            path = list(path.parts)
+            while path and path[0] != "repo":
+                del path[0]
+            if path:
+                del path[0]
+                total += 1
+                count["/".join(path[:1])] += 1
+    for folder, hits in count.items():
+        print(f"{folder}: {hits} {hits/total*100:.2f}")
 
 
 def lw_history():
