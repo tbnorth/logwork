@@ -7,6 +7,12 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
+try:
+    from functools import cache
+except ImportError:
+    from functools import lru_cache
+    def cache(function):
+        return lru_cache(None)(function)
 from pathlib import Path
 
 INTERVAL = 15  # Minutes between work log entries
@@ -32,7 +38,7 @@ SCREEN = "screen" if os.environ.get("STY") else ""
 COMMANDS = {
     "e": {
         "name": "Edit",
-        "command": rf'{SCREEN} vim {WORKLOG} -c "normal G"'
+        "command": rf'{SCREEN} vim {WORKLOG} -c "normal G"',
         # -c "s/$/\r\r/" -c "normal G" to add blank lines
     },
     "t": {
@@ -289,6 +295,11 @@ def lw_percent():
         print(f"{folder}: {hits} {hits/total*100:.2f}")
 
 
+@cache
+def real_path(path):
+    return os.path.realpath(path)
+
+
 def lw_history():
     """Show history for this folder."""
     last = last_state()
@@ -303,7 +314,7 @@ def lw_history():
             for line in in_file:
                 state = work_state(line, 0, has_tags=None)
                 if state.time:
-                    printing = state.cwd == last.cwd
+                    printing = real_path(state.cwd) == real_path(last.cwd)
                 if printing:
                     if state.time:
                         timestamp = f"{RED}# {line.strip()}{DEFAULT}"
